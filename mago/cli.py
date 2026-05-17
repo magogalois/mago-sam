@@ -118,7 +118,6 @@ def main() -> None:
             predict_spans=args.predict_spans,
             reranking_candidates=args.reranking_candidates,
         )
-        return
 
     run_interactive(
         separator=separator,
