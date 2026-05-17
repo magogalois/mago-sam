@@ -63,6 +63,18 @@
         </div>
 
         <div id="mic-status" class="status">Microphone is stopped.</div>
+        <div class="realtime-target-panel" aria-live="polite">
+          <div class="realtime-target-header">
+            <span class="realtime-target-label">Target Confirmation</span>
+            <span id="realtime-target-badge" class="target-state pending">Waiting for chunks</span>
+          </div>
+          <div class="target-chunk-row">
+            <span class="target-chunk-label">Target chunks</span>
+            <div id="target-chunk-list" class="target-chunk-list">
+              <span id="target-chunk-empty" class="target-chunk-empty">No target chunks yet.</span>
+            </div>
+          </div>
+        </div>
         <div id="chunk-results" class="chunk-results"></div>
       </section>
 

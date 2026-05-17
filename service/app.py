@@ -69,6 +69,9 @@ def convert_to_wav(
         Path: Converted WAV file path.
     """
     wav_path = UPLOAD_DIR / f"{content_id}.wav"
+    if input_path == wav_path:
+        wav_path = UPLOAD_DIR / f"{content_id}.converted.wav"
+
     cmd = [
         "ffmpeg",
         "-y",
@@ -130,6 +133,7 @@ def health() -> dict:
 async def separate_audio(
     audio: UploadFile = File(...),
     description: str = Form(...),
+    already_wav: bool = Form(False),
 ) -> dict:
     """
     Upload audio file and separate target sound.
@@ -137,6 +141,7 @@ async def separate_audio(
     Args:
         audio (UploadFile): Uploaded audio file.
         description (str): Target sound prompt.
+        already_wav (bool): If True, the upload is already 16 kHz 16-bit mono WAV.
 
     Returns:
         dict: Separation result and download URLs.
@@ -154,7 +159,7 @@ async def separate_audio(
         with upload_path.open("wb") as fout:
             shutil.copyfileobj(audio.file, fout)
 
-        wav_path = convert_to_wav(upload_path, content_id)
+        wav_path = upload_path if already_wav else convert_to_wav(upload_path, content_id)
         result = separator(
             audio=str(wav_path),
             description=description,
