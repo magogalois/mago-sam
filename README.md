@@ -16,6 +16,7 @@ SAM-Audio separates a target sound from an input audio file using a text prompt.
 - **GPU/CPU Support**: Select devices with `cpu`, `cuda`, or indexed GPUs such as `cuda:2`
 - **Small/Large Model Support**: Use `sam-audio-small` for lower GPU memory or `sam-audio-large` for higher quality
 - **CLI Support**: Run separation directly from terminal through `mago/cli.py`
+- **Web Upload Test UI**: Upload audio and test separation through a browser on port `8304`
 - **Output Artifacts**: Saves `target.wav` and `residual.wav` for each request
 
 ## Limitations
@@ -100,6 +101,34 @@ Output files are written to:
 exp/sam-audio/<content_id>/target.wav
 exp/sam-audio/<content_id>/residual.wav
 ```
+
+## Web Service
+
+Start the upload test service on port `8304`:
+
+```bash
+python service/app.py
+```
+
+Open the browser:
+
+```bash
+http://localhost:8304
+```
+
+The service loads `SAMAudioSeparator` once at startup and reuses the loaded model for each uploaded file.
+
+Environment variables:
+
+| Environment Variable | Description | Default |
+|---|---|---|
+| `SAM_AUDIO_PORT` | Web service port | `8304` |
+| `SAM_AUDIO_MODEL` | Local SAM-Audio model path | `/data/models/mstudio/sam-audio/facebook/sam-audio-small` |
+| `SAM_AUDIO_DEVICE` | Inference device | `cuda:0` |
+| `SAM_AUDIO_OUT_DIR` | Output directory | `exp/sam-audio` |
+| `SAM_AUDIO_INPUT_SAMPLE_RATE` | Uploaded/microphone WAV sample rate | `16000` |
+| `SAM_AUDIO_INPUT_SAMPLE_WIDTH` | Uploaded/microphone WAV bit depth | `16` |
+| `SAM_AUDIO_INPUT_CHANNELS` | Uploaded/microphone WAV channels | `1` |
 
 ## Python Usage
 

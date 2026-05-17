@@ -227,6 +227,7 @@ class SAMAudioSeparator:
                 reranking_candidates=reranking_candidates,
             )
 
+        detection = self._detect_target_activity(result.target[0])
         sample_rate = self.processor.audio_sampling_rate
         target_path = _out_dir / "target.wav"
         residual_path = _out_dir / "residual.wav"
@@ -244,4 +245,41 @@ class SAMAudioSeparator:
             "target": str(target_path),
             "residual": str(residual_path),
             "sample_rate": sample_rate,
+            "detection": detection,
+        }
+
+    def _detect_target_activity(
+        self,
+        waveform: torch.Tensor,
+    ) -> Dict:
+        """
+        Detect whether separated target audio has meaningful activity.
+
+        Args:
+            waveform (torch.Tensor): Target waveform.
+
+        Returns:
+            Dict: Target activity metrics and detected flag.
+        """
+        wav = waveform.detach().float().cpu()
+        if wav.numel() == 0:
+            return {
+                "detected": False,
+                "label": "No target sound",
+                "rms": 0.0,
+                "peak": 0.0,
+                "active_ratio": 0.0,
+            }
+
+        rms = torch.sqrt(torch.mean(wav.pow(2))).item()
+        peak = torch.max(torch.abs(wav)).item()
+        active_ratio = torch.mean((torch.abs(wav) > 0.01).float()).item()
+        detected = rms >= 0.003 or peak >= 0.05 or active_ratio >= 0.01
+
+        return {
+            "detected": detected,
+            "label": "Target sound detected" if detected else "No clear target sound",
+            "rms": round(rms, 6),
+            "peak": round(peak, 6),
+            "active_ratio": round(active_ratio, 6),
         }

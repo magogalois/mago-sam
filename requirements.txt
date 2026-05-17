@@ -1,3 +1,6 @@
 git+https://github.com/facebookresearch/sam-audio.git
 huggingface-hub[cli]
 nvidia-ml-py
+fastapi
+python-multipart
+uvicorn[standard]

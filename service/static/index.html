@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MAGO SAM-Audio</title>
+    <link rel="stylesheet" href="static/style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="hero">
+        <p class="eyebrow">MAGO Voice AI</p>
+        <h1>SAM-Audio Separation</h1>
+        <p class="description">
+          오디오 파일을 업로드하고 분리할 소리를 텍스트로 입력하세요.
+          예: <code>man speaking</code>, <code>drums</code>, <code>dog barking</code>
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>File Upload</h2>
+        <form id="separation-form">
+          <label for="audio">Audio File</label>
+          <input id="audio" name="audio" type="file" accept="audio/*,.flac" required />
+
+          <label for="description">Description</label>
+          <input
+            id="description"
+            name="description"
+            type="text"
+            placeholder="man speaking"
+            required
+          />
+
+          <button id="submit-button" type="submit">Separate Audio</button>
+        </form>
+
+        <div id="status" class="status">Ready.</div>
+      </section>
+
+      <section class="card">
+        <h2>Microphone Chunk Mode</h2>
+        <p class="description small">
+          마이크 입력을 chunk 단위로 녹음하고, 각 chunk를 순차적으로 분리합니다.
+          서버에서 16 kHz, 16-bit, mono WAV로 변환한 뒤 처리합니다.
+          완전 실시간이 아니라 처리 완료된 chunk가 뒤따라 출력되는 방식입니다.
+        </p>
+
+        <div class="mic-grid">
+          <div>
+            <label for="mic-description">Description</label>
+            <input id="mic-description" type="text" placeholder="man speaking" />
+          </div>
+          <div>
+            <label for="chunk-seconds">Chunk Seconds</label>
+            <input id="chunk-seconds" type="number" min="3" max="30" value="5" />
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="start-mic-button" type="button">Start Microphone</button>
+          <button id="stop-mic-button" type="button" disabled>Stop</button>
+        </div>
+
+        <div id="mic-status" class="status">Microphone is stopped.</div>
+        <div id="chunk-results" class="chunk-results"></div>
+      </section>
+
+      <section id="result" class="card result hidden">
+        <h2>Result</h2>
+        <p id="content-id"></p>
+        <div id="target-detection" class="detection-badge"></div>
+
+        <div class="player">
+          <h3>Original</h3>
+          <audio id="original-audio" controls></audio>
+          <a id="original-download" href="#" download>Download original audio</a>
+        </div>
+
+        <div class="player">
+          <h3>Target</h3>
+          <audio id="target-audio" controls></audio>
+          <a id="target-download" href="#" download>Download target.wav</a>
+        </div>
+
+        <div class="player">
+          <h3>Residual</h3>
+          <audio id="residual-audio" controls></audio>
+          <a id="residual-download" href="#" download>Download residual.wav</a>
+        </div>
+      </section>
+    </main>
+
+    <script src="static/main.js"></script>
+  </body>
+</html>
