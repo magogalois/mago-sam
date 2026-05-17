@@ -134,6 +134,9 @@ async def separate_audio(
     audio: UploadFile = File(...),
     description: str = Form(...),
     already_wav: bool = Form(False),
+    stream_mode: bool = Form(False),
+    chunk_index: int | None = Form(None),
+    context_seconds: float | None = Form(None),
 ) -> dict:
     """
     Upload audio file and separate target sound.
@@ -142,6 +145,9 @@ async def separate_audio(
         audio (UploadFile): Uploaded audio file.
         description (str): Target sound prompt.
         already_wav (bool): If True, the upload is already 16 kHz 16-bit mono WAV.
+        stream_mode (bool): If True, treat upload as a streaming window.
+        chunk_index (int | None): Streaming window index.
+        context_seconds (float | None): Seconds included in this streaming window.
 
     Returns:
         dict: Separation result and download URLs.
@@ -176,6 +182,11 @@ async def separate_audio(
         "description": result["description"],
         "sample_rate": result["sample_rate"],
         "detection": result["detection"],
+        "stream": {
+            "enabled": stream_mode,
+            "chunk_index": chunk_index,
+            "context_seconds": context_seconds,
+        },
         "original_url": f"api/uploads/{result['content_id']}",
         "target_url": f"api/files/{result['content_id']}/target.wav",
         "residual_url": f"api/files/{result['content_id']}/residual.wav",

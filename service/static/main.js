@@ -12,6 +12,7 @@ const targetDownload = document.getElementById("target-download");
 const residualDownload = document.getElementById("residual-download");
 const micDescription = document.getElementById("mic-description");
 const chunkSeconds = document.getElementById("chunk-seconds");
+const contextSeconds = document.getElementById("context-seconds");
 const startMicButton = document.getElementById("start-mic-button");
 const stopMicButton = document.getElementById("stop-mic-button");
 const micStatus = document.getElementById("mic-status");
@@ -19,8 +20,19 @@ const chunkResults = document.getElementById("chunk-results");
 const realtimeTargetBadge = document.getElementById("realtime-target-badge");
 const targetChunkList = document.getElementById("target-chunk-list");
 const targetChunkEmpty = document.getElementById("target-chunk-empty");
+const detectionGraph = document.getElementById("detection-graph");
+const detectionGraphEmpty = document.getElementById("detection-graph-empty");
+const detectionLineGraph = document.getElementById("detection-line-graph");
+const detectionLine = document.getElementById("detection-line");
+const detectionPoints = document.getElementById("detection-points");
 
 const TARGET_SAMPLE_RATE = 16000;
+const PROCESSOR_BUFFER_SIZE = 4096;
+const RMS_GRAPH_MIN_DB = -40;
+const RMS_GRAPH_MAX_DB = -20;
+const RMS_GRAPH_WIDTH_PER_POINT = 42;
+const RMS_GRAPH_HEIGHT = 100;
+const RMS_GRAPH_PADDING = 8;
 
 let audioContext = null;
 let micSource = null;
@@ -28,10 +40,12 @@ let micProcessor = null;
 let micSilence = null;
 let micStream = null;
 let micChunkTimer = null;
-let micBuffers = [];
+let streamSamples = new Float32Array(0);
+let maxStreamSamples = 0;
 let chunkIndex = 0;
 let uploadQueue = Promise.resolve();
 let detectedTargetChunks = [];
+let rmsGraphPoints = [];
 
 function setStatus(message) {
   statusBox.textContent = message;
@@ -52,6 +66,11 @@ function getDetectionText(detection) {
 function toDbText(value) {
   const amplitude = Math.max(Number(value) || 0, 0.000001);
   return `${Math.round(20 * Math.log10(amplitude))} dB`;
+}
+
+function toDbValue(value) {
+  const amplitude = Math.max(Number(value) || 0, 0.000001);
+  return 20 * Math.log10(amplitude);
 }
 
 function setDetectionBadge(element, detection) {
@@ -110,19 +129,6 @@ function setMicStatus(message) {
   micStatus.textContent = message;
 }
 
-function mergeAudioBuffers(buffers) {
-  const sampleCount = buffers.reduce((total, buffer) => total + buffer.length, 0);
-  const samples = new Float32Array(sampleCount);
-  let offset = 0;
-
-  buffers.forEach((buffer) => {
-    samples.set(buffer, offset);
-    offset += buffer.length;
-  });
-
-  return samples;
-}
-
 function resampleMonoAudio(samples, inputSampleRate, outputSampleRate) {
   if (inputSampleRate === outputSampleRate) {
     return samples;
@@ -141,6 +147,10 @@ function resampleMonoAudio(samples, inputSampleRate, outputSampleRate) {
   }
 
   return output;
+}
+
+function ensureTargetSampleRate(samples, inputSampleRate) {
+  return resampleMonoAudio(samples, inputSampleRate, TARGET_SAMPLE_RATE);
 }
 
 function encodeWav(samples, sampleRate) {
@@ -179,14 +189,17 @@ function encodeWav(samples, sampleRate) {
   return new Blob([view], { type: "audio/wav" });
 }
 
-function createWavChunkBlob(buffers, inputSampleRate) {
-  const mergedSamples = mergeAudioBuffers(buffers);
-  const resampledSamples = resampleMonoAudio(
-    mergedSamples,
-    inputSampleRate,
-    TARGET_SAMPLE_RATE,
-  );
-  return encodeWav(resampledSamples, TARGET_SAMPLE_RATE);
+function appendStreamSamples(samples) {
+  const combined = new Float32Array(streamSamples.length + samples.length);
+  combined.set(streamSamples);
+  combined.set(samples, streamSamples.length);
+
+  if (combined.length <= maxStreamSamples) {
+    streamSamples = combined;
+    return;
+  }
+
+  streamSamples = combined.slice(combined.length - maxStreamSamples);
 }
 
 function resetRealtimeTargetPanel() {
@@ -196,9 +209,20 @@ function resetRealtimeTargetPanel() {
   targetChunkList.innerHTML = "";
   targetChunkList.appendChild(targetChunkEmpty);
   targetChunkEmpty.classList.remove("hidden");
+  detectionGraph.innerHTML = "";
+  detectionGraph.appendChild(detectionLineGraph);
+  detectionGraph.appendChild(detectionGraphEmpty);
+  detectionLine.setAttribute("points", "");
+  detectionPoints.innerHTML = "";
+  detectionLineGraph.setAttribute("viewBox", `0 0 100 ${RMS_GRAPH_HEIGHT}`);
+  detectionLineGraph.style.width = "100%";
+  rmsGraphPoints = [];
+  detectionGraphEmpty.classList.remove("hidden");
 }
 
 function updateRealtimeTargetPanel(index, detection) {
+  appendDetectionGraphPoint(index, detection);
+
   if (!detection || !detection.detected) {
     if (detectedTargetChunks.length > 0) {
       realtimeTargetBadge.textContent = `Target confirmed (${detectedTargetChunks.length} chunks)`;
@@ -222,14 +246,48 @@ function updateRealtimeTargetPanel(index, detection) {
   targetChunkList.appendChild(chunkBadge);
 }
 
-function appendChunkResult(index, data) {
+function appendDetectionGraphPoint(index, detection) {
+  detectionGraphEmpty.classList.add("hidden");
+
+  const rawDb = toDbValue(detection && detection.rms);
+  const clippedDb = Math.max(RMS_GRAPH_MIN_DB, Math.min(RMS_GRAPH_MAX_DB, rawDb));
+  const graphRange = RMS_GRAPH_MAX_DB - RMS_GRAPH_MIN_DB;
+  const x = RMS_GRAPH_PADDING + rmsGraphPoints.length * RMS_GRAPH_WIDTH_PER_POINT;
+  const usableHeight = RMS_GRAPH_HEIGHT - RMS_GRAPH_PADDING * 2;
+  const y =
+    RMS_GRAPH_PADDING +
+    ((RMS_GRAPH_MAX_DB - clippedDb) / graphRange) * usableHeight;
+
+  rmsGraphPoints.push({ x, y, db: Math.round(clippedDb), rawDb: Math.round(rawDb), index });
+  const graphWidth = Math.max(100, x + RMS_GRAPH_PADDING);
+  detectionLineGraph.setAttribute("viewBox", `0 0 ${graphWidth} ${RMS_GRAPH_HEIGHT}`);
+  detectionLineGraph.style.width = `${graphWidth}px`;
+  detectionLine.setAttribute(
+    "points",
+    rmsGraphPoints.map((point) => `${point.x},${point.y}`).join(" "),
+  );
+
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("class", detection && detection.detected ? "detected" : "not-detected");
+  circle.setAttribute("cx", String(x));
+  circle.setAttribute("cy", String(y));
+  circle.setAttribute("r", "4");
+
+  const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+  title.textContent = `Window ${index}: ${Math.round(clippedDb)} dB (raw ${Math.round(rawDb)} dB)`;
+  circle.appendChild(title);
+  detectionPoints.appendChild(circle);
+  detectionGraph.scrollLeft = detectionGraph.scrollWidth;
+}
+
+function appendChunkResult(index, data, durationSeconds) {
   const cacheKey = `?t=${Date.now()}`;
   const card = document.createElement("div");
   card.className = "chunk-card";
   const detectionClass = data.detection && data.detection.detected ? "detected" : "not-detected";
   card.innerHTML = `
-    <h3>Chunk ${index}</h3>
-    <p>Content ID: ${data.content_id}</p>
+    <h3>Window ${index}</h3>
+    <p>${durationSeconds.toFixed(1)}s sliding context · Content ID: ${data.content_id}</p>
     <div class="detection-badge ${detectionClass}">${getDetectionText(data.detection)}</div>
     <details class="chunk-audio-details">
       <summary>Show audio playback</summary>
@@ -253,7 +311,7 @@ function appendChunkResult(index, data) {
   chunkResults.appendChild(card);
 }
 
-async function uploadMicrophoneChunk(blob, index) {
+async function uploadMicrophoneChunk(blob, index, durationSeconds) {
   const description = micDescription.value.trim();
   if (!description) {
     setMicStatus("Description is required.");
@@ -261,38 +319,42 @@ async function uploadMicrophoneChunk(blob, index) {
   }
 
   const formData = new FormData();
-  formData.append("audio", blob, `mic-chunk-${index}.wav`);
+  formData.append("audio", blob, `stream-window-${index}.wav`);
   formData.append("description", description);
   formData.append("already_wav", "true");
+  formData.append("stream_mode", "true");
+  formData.append("chunk_index", String(index));
+  formData.append("context_seconds", durationSeconds.toFixed(3));
 
-  setMicStatus(`Processing chunk ${index}...`);
+  setMicStatus(`Processing streaming window ${index}...`);
   const response = await fetch("api/separate", {
     method: "POST",
     body: formData,
   });
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.detail || `Failed to process chunk ${index}.`);
+    throw new Error(data.detail || `Failed to process streaming window ${index}.`);
   }
 
   updateRealtimeTargetPanel(index, data.detection);
-  appendChunkResult(index, data);
-  setMicStatus(`Chunk ${index} done.`);
+  appendChunkResult(index, data, durationSeconds);
+  setMicStatus(`Streaming window ${index} done.`);
 }
 
 function flushMicrophoneChunk() {
-  if (!audioContext || micBuffers.length === 0) {
+  if (!audioContext || streamSamples.length === 0) {
     return;
   }
 
-  const buffers = micBuffers;
-  micBuffers = [];
   chunkIndex += 1;
   const currentIndex = chunkIndex;
-  const wavBlob = createWavChunkBlob(buffers, audioContext.sampleRate);
+  const windowSamples = streamSamples.slice();
+  const durationSeconds = windowSamples.length / audioContext.sampleRate;
+  const wavSamples = ensureTargetSampleRate(windowSamples, audioContext.sampleRate);
+  const wavBlob = encodeWav(wavSamples, TARGET_SAMPLE_RATE);
 
   uploadQueue = uploadQueue
-    .then(() => uploadMicrophoneChunk(wavBlob, currentIndex))
+    .then(() => uploadMicrophoneChunk(wavBlob, currentIndex, durationSeconds))
     .catch((error) => {
       setMicStatus(error.message);
     });
@@ -306,8 +368,14 @@ startMicButton.addEventListener("click", async () => {
   }
 
   const seconds = Number(chunkSeconds.value || 5);
-  if (seconds < 3) {
-    setMicStatus("Chunk seconds must be at least 3.");
+  if (seconds < 1) {
+    setMicStatus("Step seconds must be at least 1.");
+    return;
+  }
+
+  const contextWindowSeconds = Number(contextSeconds.value || 6);
+  if (contextWindowSeconds < seconds) {
+    setMicStatus("Context seconds must be greater than or equal to step seconds.");
     return;
   }
 
@@ -323,18 +391,19 @@ startMicButton.addEventListener("click", async () => {
     });
     audioContext = new AudioContext({ sampleRate: TARGET_SAMPLE_RATE });
     micSource = audioContext.createMediaStreamSource(micStream);
-    micProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+    micProcessor = audioContext.createScriptProcessor(PROCESSOR_BUFFER_SIZE, 1, 1);
     micSilence = audioContext.createGain();
     micSilence.gain.value = 0;
     chunkIndex = 0;
-    micBuffers = [];
+    streamSamples = new Float32Array(0);
+    maxStreamSamples = Math.round(contextWindowSeconds * audioContext.sampleRate);
     uploadQueue = Promise.resolve();
     chunkResults.innerHTML = "";
     resetRealtimeTargetPanel();
 
     micProcessor.onaudioprocess = (event) => {
       const input = event.inputBuffer.getChannelData(0);
-      micBuffers.push(new Float32Array(input));
+      appendStreamSamples(new Float32Array(input));
 
       const output = event.outputBuffer.getChannelData(0);
       output.fill(0);
@@ -347,7 +416,9 @@ startMicButton.addEventListener("click", async () => {
 
     startMicButton.disabled = true;
     stopMicButton.disabled = false;
-    setMicStatus(`Recording microphone in ${seconds}s WAV chunks...`);
+    setMicStatus(
+      `Streaming every ${seconds}s with ${contextWindowSeconds}s sliding context...`,
+    );
   } catch (error) {
     setMicStatus(error.message);
   }

@@ -27,6 +27,7 @@ from sam.utils.logs import get_logger
 logger = get_logger(__name__, level='INFO')
 MODEL_ROOT = Path("/data/models/mstudio/sam-audio")
 T5_MODEL_PATH = MODEL_ROOT / "t5-base"
+TARGET_RMS_THRESHOLD = 0.01
 
 
 class SAMAudioSeparator:
@@ -274,7 +275,7 @@ class SAMAudioSeparator:
         rms = torch.sqrt(torch.mean(wav.pow(2))).item()
         peak = torch.max(torch.abs(wav)).item()
         active_ratio = torch.mean((torch.abs(wav) > 0.01).float()).item()
-        detected = rms >= 0.003 or peak >= 0.05 or active_ratio >= 0.01
+        detected = rms >= TARGET_RMS_THRESHOLD
 
         return {
             "detected": detected,
@@ -282,4 +283,5 @@ class SAMAudioSeparator:
             "rms": round(rms, 6),
             "peak": round(peak, 6),
             "active_ratio": round(active_ratio, 6),
+            "rms_threshold": TARGET_RMS_THRESHOLD,
         }

@@ -75,7 +75,7 @@ form {
 .mic-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: 1fr 180px;
+  grid-template-columns: 1fr 160px 180px;
 }
 
 .button-row {
@@ -183,6 +183,12 @@ button:not(:disabled):hover {
   margin-top: 14px;
 }
 
+.target-graph-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .target-chunk-list {
   display: flex;
   flex-wrap: wrap;
@@ -203,6 +209,55 @@ button:not(:disabled):hover {
 .target-chunk-empty {
   color: var(--muted);
   font-size: 14px;
+}
+
+.detection-graph {
+  position: relative;
+  min-height: 120px;
+  overflow-x: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.detection-line-graph {
+  display: block;
+  height: 100px;
+  min-width: 100%;
+}
+
+.detection-line {
+  fill: none;
+  stroke: var(--primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.graph-grid-line {
+  stroke: #cbd5e1;
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.graph-threshold-line {
+  stroke: #f97316;
+  stroke-dasharray: 5 5;
+  stroke-width: 1.5;
+}
+
+#detection-points circle {
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+#detection-points circle.detected {
+  fill: #16a34a;
+}
+
+#detection-points circle.not-detected {
+  fill: #dc2626;
 }
 
 .chunk-card {

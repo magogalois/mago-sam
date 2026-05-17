@@ -39,11 +39,11 @@
       </section>
 
       <section class="card">
-        <h2>Microphone Chunk Mode</h2>
+        <h2>Microphone Streaming Window Mode</h2>
         <p class="description small">
-          마이크 입력을 chunk 단위로 녹음하고, 각 chunk를 순차적으로 분리합니다.
-          서버에서 16 kHz, 16-bit, mono WAV로 변환한 뒤 처리합니다.
-          완전 실시간이 아니라 처리 완료된 chunk가 뒤따라 출력되는 방식입니다.
+          마이크 입력을 16 kHz, 16-bit, mono WAV buffer로 유지하고, 일정 step마다
+          최근 context window를 separator에 넘깁니다. 모델은 파일 단위 API를 사용하지만
+          화면에서는 sliding window streaming처럼 결과가 누적됩니다.
         </p>
 
         <div class="mic-grid">
@@ -52,8 +52,12 @@
             <input id="mic-description" type="text" placeholder="man speaking" />
           </div>
           <div>
-            <label for="chunk-seconds">Chunk Seconds</label>
-            <input id="chunk-seconds" type="number" min="3" max="30" value="5" />
+            <label for="chunk-seconds">Step Seconds</label>
+            <input id="chunk-seconds" type="number" min="1" max="30" value="3" />
+          </div>
+          <div>
+            <label for="context-seconds">Context Seconds</label>
+            <input id="context-seconds" type="number" min="3" max="60" value="6" />
           </div>
         </div>
 
@@ -72,6 +76,18 @@
             <span class="target-chunk-label">Target chunks</span>
             <div id="target-chunk-list" class="target-chunk-list">
               <span id="target-chunk-empty" class="target-chunk-empty">No target chunks yet.</span>
+            </div>
+          </div>
+          <div class="target-graph-row">
+            <span class="target-chunk-label">Target RMS graph (-40 dB to -20 dB)</span>
+            <div id="detection-graph" class="detection-graph" aria-label="Target RMS graph">
+              <svg id="detection-line-graph" class="detection-line-graph" role="img">
+                <line class="graph-grid-line" x1="0" y1="8" x2="100%" y2="8"></line>
+                <line class="graph-threshold-line" x1="0" y1="92" x2="100%" y2="92"></line>
+                <polyline id="detection-line" class="detection-line" points=""></polyline>
+                <g id="detection-points"></g>
+              </svg>
+              <span id="detection-graph-empty" class="target-chunk-empty">No results yet.</span>
             </div>
           </div>
         </div>
