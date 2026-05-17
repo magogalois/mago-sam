@@ -1,0 +1,34 @@
+services:
+  mago-sam-audio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mago-sam-audio
+    restart: unless-stopped
+    ports:
+      - "8304:8080"
+    environment:
+      SAM_AUDIO_PORT: "8080"
+      SAM_AUDIO_DEVICE: "cuda:0"
+      SAM_AUDIO_MODEL: "/data/models/mstudio/sam-audio/facebook/sam-audio-small"
+      SAM_AUDIO_OUT_DIR: "/app/exp/sam-audio"
+      SAM_AUDIO_INPUT_SAMPLE_RATE: "16000"
+      SAM_AUDIO_INPUT_SAMPLE_WIDTH: "16"
+      SAM_AUDIO_INPUT_CHANNELS: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      NVIDIA_VISIBLE_DEVICES: "2"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    volumes:
+      - /data/models/mstudio/sam-audio:/data/models/mstudio/sam-audio:ro
+      - ./exp:/app/exp
+      - ./service/uploads:/app/service/uploads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids:
+                - "2"
+              capabilities:
+                - gpu
